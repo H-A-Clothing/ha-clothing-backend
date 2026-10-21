@@ -1,0 +1,1 @@
+// Stripe payment URL paths.
