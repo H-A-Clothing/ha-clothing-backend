@@ -3,16 +3,8 @@
 import pg from "pg";
 import { env } from "./env.js";
 
-// SSL is configured below, so drop sslmode from the URL to stop pg overriding those settings.
-function stripSslMode(url) {
-  const parsed = new URL(url);
-  parsed.searchParams.delete("sslmode");
-  return parsed.toString();
-}
-
 export const pool = new pg.Pool({
-  connectionString: stripSslMode(env.databaseUrl),
-  ssl: env.databaseSsl ? { rejectUnauthorized: true } : false,
+  ...env.database,
   max: 10,
   idleTimeoutMillis: 30_000,
   // Neon can take a few seconds to wake an idle database.
