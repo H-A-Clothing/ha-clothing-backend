@@ -1,7 +1,7 @@
 // Product business rules.
 import { AppError } from "../../utils/errors.js";
 import * as repo from "./products.repository.js";
-import { validateCategory, validateColor } from "./products.validation.js";
+import { parseProductListQuery, validateCategory, validateColor, validateProduct } from "./products.validation.js";
 
 const UNIQUE_VIOLATION = "23505";
 
@@ -85,4 +85,77 @@ export async function updateColor(id, body) {
   } catch (error) {
     return rethrowConflict(error, "A colour with this name already exists");
   }
+}
+
+// ---- Products ----
+// The database returns decimals as text ("1500.00"); the API sends numbers.
+function formatProduct(row) {
+  return {
+    ...row,
+    price: Number(row.price),
+    sale_price: row.sale_price === null || row.sale_price === undefined ? null : Number(row.sale_price),
+  };
+}
+
+function assertSalePriceBelowPrice(price, salePrice) {
+  if (salePrice !== null && salePrice !== undefined && Number(salePrice) >= Number(price)) {
+    throw AppError.badRequest("Validation failed", { sale_price: "Sale price must be lower than the price" });
+  }
+}
+
+async function assertCategoryExists(categoryId) {
+  if (!(await repo.findCategoryById(categoryId))) {
+    throw AppError.badRequest("Validation failed", { category_id: "Category does not exist" });
+  }
+}
+
+export async function listProducts(query) {
+  const { page, limit, offset, filters } = parseProductListQuery(query);
+  const { rows, total } = await repo.listProducts(filters, { limit, offset });
+  return { data: rows.map(formatProduct), meta: { page, limit, total } };
+}
+
+export async function getProduct(id) {
+  const product = await repo.findProductById(id);
+  if (!product) throw AppError.notFound("Product not found");
+  const [variants, images] = await Promise.all([repo.listVariantsForProduct(id), repo.listImagesForProduct(id)]);
+  return { ...formatProduct(product), variants, images };
+}
+
+export async function createProduct(body) {
+  const data = validateProduct(body);
+  assertSalePriceBelowPrice(data.price, data.sale_price);
+  await assertCategoryExists(data.category_id);
+  if (await repo.findProductBySlug(data.slug)) throw AppError.conflict("A product with this slug already exists");
+  try {
+    const created = await repo.insertProduct(data);
+    return await getProduct(created.id);
+  } catch (error) {
+    return rethrowConflict(error, "A product with this slug already exists");
+  }
+}
+
+export async function updateProduct(id, body) {
+  const data = validateProduct(body, { partial: true });
+  if (!Object.keys(data).length) throw AppError.badRequest("Nothing to update");
+
+  const existing = await repo.findProductById(id);
+  if (!existing) throw AppError.notFound("Product not found");
+
+  // The sale price rule depends on both values, so check the final combination.
+  const finalPrice = data.price ?? existing.price;
+  const finalSale = data.sale_price !== undefined ? data.sale_price : existing.sale_price;
+  assertSalePriceBelowPrice(finalPrice, finalSale);
+
+  if (data.category_id !== undefined) await assertCategoryExists(data.category_id);
+  if (data.slug && data.slug !== existing.slug) {
+    const same = await repo.findProductBySlug(data.slug);
+    if (same && same.id !== id) throw AppError.conflict("A product with this slug already exists");
+  }
+  try {
+    await repo.updateProduct(id, data);
+  } catch (error) {
+    rethrowConflict(error, "A product with this slug already exists");
+  }
+  return getProduct(id);
 }
