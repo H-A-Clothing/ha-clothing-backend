@@ -11,6 +11,11 @@ router.get("/categories", controller.listCategories);
 router.post("/categories", controller.createCategory);
 router.patch("/categories/:id", controller.updateCategory);
 
+router.get("/products", controller.listProducts);
+router.get("/products/:id", controller.getProduct);
+router.post("/products", controller.createProduct);
+router.patch("/products/:id", controller.updateProduct);
+
 router.get("/colors", controller.listColors);
 router.post("/colors", controller.createColor);
 router.patch("/colors/:id", controller.updateColor);
