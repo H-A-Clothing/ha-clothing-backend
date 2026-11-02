@@ -28,3 +28,19 @@ export const createColor = handle(async (req, res) => {
 export const updateColor = handle(async (req, res) => {
   res.json({ data: await service.updateColor(parseId(req.params.id), req.body) });
 });
+
+export const listProducts = handle(async (req, res) => {
+  res.json(await service.listProducts(req.query));
+});
+
+export const getProduct = handle(async (req, res) => {
+  res.json({ data: await service.getProduct(parseId(req.params.id)) });
+});
+
+export const createProduct = handle(async (req, res) => {
+  res.status(201).json({ data: await service.createProduct(req.body) });
+});
+
+export const updateProduct = handle(async (req, res) => {
+  res.json({ data: await service.updateProduct(parseId(req.params.id), req.body) });
+});
