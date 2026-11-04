@@ -14,6 +14,21 @@ npm run dev                   # API on http://localhost:3000/api/v1
 
 Health check: `GET /api/v1/health`
 
+## Payments (Stripe test mode)
+
+How payments work end to end: [docs/payment-api-contract.md](docs/payment-api-contract.md).
+The API starts without Stripe keys; only the payment endpoints need them.
+
+1. Put your Stripe **test** secret key (`sk_test_…`) in `.env` as `STRIPE_SECRET_KEY`.
+2. Install the [Stripe CLI](https://docs.stripe.com/stripe-cli), run `stripe login`, then forward webhooks to the API:
+   ```powershell
+   stripe listen --forward-to localhost:3000/api/v1/payments/stripe/webhook
+   ```
+   It prints a `whsec_…` secret: put it in `.env` as `STRIPE_WEBHOOK_SECRET` and restart the API.
+   Keep `stripe listen` running while you test.
+3. Pay with test card `4242 4242 4242 4242`, any future expiry date, any CVC.
+   Declined card: `4000 0000 0000 0002`.
+
 ## Database migrations (Knex)
 
 All schema changes go through migrations. Nobody edits tables by hand on the shared database.

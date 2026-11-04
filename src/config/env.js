@@ -38,4 +38,11 @@ export const env = {
     ssl: databaseSsl ? { rejectUnauthorized: true } : false,
   },
   jwtSecret: process.env.JWT_SECRET,
+  // Where Stripe/PayHere send the customer back to (the payment success and failure pages).
+  frontendUrl: (process.env.FRONTEND_URL ?? "http://localhost:5173").replace(/\/$/, ""),
+  // Optional at startup, so members without Stripe keys can still run the API.
+  stripe: {
+    secretKey: process.env.STRIPE_SECRET_KEY,
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+  },
 };
