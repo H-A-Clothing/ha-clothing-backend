@@ -1,0 +1,47 @@
+name: Backend CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Backend checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      NODE_ENV: test
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            .github/ci/package-lock.json
+      # main has no root lockfile yet. develop keeps its existing root lockfile.
+      # The fallback matches main's package.json; npm ci rejects any mismatch.
+      - name: Select dependency lockfile
+        shell: bash
+        run: |
+          if [ ! -f package-lock.json ]; then
+            cp .github/ci/package-lock.json package-lock.json
+          fi
+      - name: Install dependencies
+        run: npm ci
+      - name: Run lint if configured
+        run: npm run lint --if-present
+      # The current test script uses Node's built-in runner; no tests exist yet.
+      # No database URL or external service credentials are supplied to CI.
+      - name: Run tests
+        run: npm test
