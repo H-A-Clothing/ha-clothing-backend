@@ -4,6 +4,7 @@ import express from "express";
 import { env } from "./config/env.js";
 import { checkConnection } from "./config/database.js";
 import { errorHandler, notFoundHandler } from "./middleware/error.middleware.js";
+import catalogueRoutes from "./modules/catalogue/catalogue.routes.js";
 import productsRoutes from "./modules/products/products.routes.js";
 
 export const app = express();
@@ -22,10 +23,9 @@ api.get("/health", async (req, res) => {
   }
 });
 
-// Each member mounts their module router here once it exports one, e.g.:
-// import catalogueRoutes from "./modules/catalogue/catalogue.routes.js";
-// api.use("/catalogue", catalogueRoutes);
-api.use("/admin", productsRoutes);
+// Each member mounts their module router here once it exports one.
+api.use("/catalogue", catalogueRoutes); // M1
+api.use("/admin", productsRoutes); // M4
 
 app.use("/api/v1", api);
 
