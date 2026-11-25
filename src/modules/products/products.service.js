@@ -1,7 +1,15 @@
 // Product business rules.
 import { AppError } from "../../utils/errors.js";
 import * as repo from "./products.repository.js";
-import { parseProductListQuery, validateCategory, validateColor, validateProduct } from "./products.validation.js";
+import {
+  parseProductListQuery,
+  validateBulkVariants,
+  validateCategory,
+  validateColor,
+  validateProduct,
+  validateVariant,
+  validateVariantUpdate,
+} from "./products.validation.js";
 
 const UNIQUE_VIOLATION = "23505";
 
@@ -158,4 +166,95 @@ export async function updateProduct(id, body) {
     rethrowConflict(error, "A product with this slug already exists");
   }
   return getProduct(id);
+}
+
+
+// ---- Variants ----
+// Readable, stable and unique, e.g. HA-12-3-M (product 12, colour 3, size M).
+const autoSku = (productId, colorId, size) => `HA-${productId}-${colorId}-${size.toUpperCase()}`;
+
+async function assertProductExists(productId) {
+  if (!(await repo.findProductById(productId))) throw AppError.notFound("Product not found");
+}
+
+export async function listVariants(productId) {
+  await assertProductExists(productId);
+  return repo.listVariantsForProduct(productId);
+}
+
+export async function createVariant(productId, body) {
+  const data = validateVariant(body);
+  await assertProductExists(productId);
+
+  if (!(await repo.findColorById(data.color_id))) {
+    throw AppError.badRequest("Validation failed", { color_id: "Colour does not exist" });
+  }
+  if (await repo.findVariantByCombination(productId, data.color_id, data.size)) {
+    throw AppError.conflict("This size and colour already exists for the product");
+  }
+
+  const sku = data.sku ?? autoSku(productId, data.color_id, data.size);
+  if (await repo.findVariantBySku(sku)) throw AppError.conflict("This SKU is already used");
+
+  try {
+    const created = await repo.insertVariant({ product_id: productId, ...data, sku });
+    return await repo.findVariantWithColor(created.id);
+  } catch (error) {
+    return rethrowConflict(error, "This size and colour, or this SKU, already exists");
+  }
+}
+
+// Adds every missing size x colour combination in one go. Existing ones are skipped.
+export async function createVariantsBulk(productId, body) {
+  const { colorIds, sizes } = validateBulkVariants(body);
+  await assertProductExists(productId);
+
+  const foundColors = await repo.findColorIds(colorIds);
+  const missing = colorIds.filter((id) => !foundColors.includes(id));
+  if (missing.length) {
+    throw AppError.badRequest("Validation failed", { color_ids: `Colour does not exist: ${missing.join(", ")}` });
+  }
+
+  const existing = await repo.listVariantsForProduct(productId);
+  const taken = new Set(existing.map((variant) => `${variant.color_id}|${variant.size}`));
+
+  const toCreate = [];
+  for (const colorId of colorIds) {
+    for (const size of sizes) {
+      if (!taken.has(`${colorId}|${size}`)) {
+        toCreate.push({ product_id: productId, color_id: colorId, size, sku: autoSku(productId, colorId, size) });
+      }
+    }
+  }
+
+  const skipped = colorIds.length * sizes.length - toCreate.length;
+  if (!toCreate.length) return { created: [], skipped };
+
+  try {
+    await repo.insertVariants(toCreate);
+  } catch (error) {
+    rethrowConflict(error, "One of these SKUs is already used");
+  }
+  const variants = await repo.listVariantsForProduct(productId);
+  const createdKeys = new Set(toCreate.map((variant) => `${variant.color_id}|${variant.size}`));
+  return { created: variants.filter((variant) => createdKeys.has(`${variant.color_id}|${variant.size}`)), skipped };
+}
+
+export async function updateVariant(variantId, body) {
+  const data = validateVariantUpdate(body);
+  if (!Object.keys(data).length) throw AppError.badRequest("Nothing to update");
+
+  const existing = await repo.findVariantById(variantId);
+  if (!existing) throw AppError.notFound("Variant not found");
+
+  if (data.sku && data.sku !== existing.sku) {
+    const same = await repo.findVariantBySku(data.sku);
+    if (same && same.id !== variantId) throw AppError.conflict("This SKU is already used");
+  }
+  try {
+    await repo.updateVariant(variantId, data);
+  } catch (error) {
+    rethrowConflict(error, "This SKU is already used");
+  }
+  return repo.findVariantWithColor(variantId);
 }
