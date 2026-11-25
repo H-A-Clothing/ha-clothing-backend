@@ -178,3 +178,95 @@ export function parseProductListQuery(query = {}) {
   fail(errors);
   return { page, limit, offset: (page - 1) * limit, filters: { search, categoryId, isActive } };
 }
+
+
+// ---- Variants ----
+export const SIZES = ["XS", "S", "M", "L", "XL", "XXL", "Free"];
+const SIZE_LOOKUP = new Map(SIZES.map((size) => [size.toLowerCase(), size]));
+const SKU_PATTERN = /^[A-Z0-9-]{1,60}$/;
+
+function normalizeSize(value) {
+  return typeof value === "string" ? SIZE_LOOKUP.get(value.trim().toLowerCase()) : undefined;
+}
+
+function normalizeSku(value) {
+  return typeof value === "string" ? value.trim().toUpperCase() : "";
+}
+
+// POST /products/:id/variants   { color_id, size, sku?, is_active? }
+export function validateVariant(body = {}) {
+  const errors = {};
+  const data = {};
+
+  if (!Number.isInteger(body.color_id) || body.color_id <= 0) errors.color_id = "Choose a colour";
+  else data.color_id = body.color_id;
+
+  const size = normalizeSize(body.size);
+  if (!size) errors.size = `Must be one of: ${SIZES.join(", ")}`;
+  else data.size = size;
+
+  if (body.sku !== undefined && body.sku !== null && body.sku !== "") {
+    const sku = normalizeSku(body.sku);
+    if (!SKU_PATTERN.test(sku)) errors.sku = "Use letters, numbers and hyphens only (max 60 characters)";
+    else data.sku = sku;
+  }
+
+  if (body.is_active !== undefined) {
+    if (typeof body.is_active !== "boolean") errors.is_active = "Must be true or false";
+    else data.is_active = body.is_active;
+  }
+
+  fail(errors);
+  return data;
+}
+
+// PATCH /variants/:variantId   { sku?, is_active? }
+// Size and colour cannot change: carts and orders point at the variant.
+export function validateVariantUpdate(body = {}) {
+  const errors = {};
+  const data = {};
+
+  if (body.size !== undefined || body.color_id !== undefined) {
+    errors.size = "Size and colour cannot be changed. Disable this variant and add a new one.";
+  }
+
+  if (body.sku !== undefined) {
+    const sku = normalizeSku(body.sku);
+    if (!SKU_PATTERN.test(sku)) errors.sku = "Use letters, numbers and hyphens only (max 60 characters)";
+    else data.sku = sku;
+  }
+
+  if (body.is_active !== undefined) {
+    if (typeof body.is_active !== "boolean") errors.is_active = "Must be true or false";
+    else data.is_active = body.is_active;
+  }
+
+  fail(errors);
+  return data;
+}
+
+// POST /products/:id/variants/bulk   { color_ids: [1, 2], sizes: ["S", "M", "L"] }
+export function validateBulkVariants(body = {}) {
+  const errors = {};
+
+  let colorIds = [];
+  if (!Array.isArray(body.color_ids) || body.color_ids.length === 0 || body.color_ids.length > 20) {
+    errors.color_ids = "Send 1 to 20 colour ids";
+  } else if (!body.color_ids.every((id) => Number.isInteger(id) && id > 0)) {
+    errors.color_ids = "Every colour id must be a positive whole number";
+  } else {
+    colorIds = [...new Set(body.color_ids)];
+  }
+
+  let sizes = [];
+  if (!Array.isArray(body.sizes) || body.sizes.length === 0) {
+    errors.sizes = `Send at least one size from: ${SIZES.join(", ")}`;
+  } else {
+    const normalized = body.sizes.map(normalizeSize);
+    if (normalized.some((size) => !size)) errors.sizes = `Every size must be one of: ${SIZES.join(", ")}`;
+    else sizes = [...new Set(normalized)];
+  }
+
+  fail(errors);
+  return { colorIds, sizes };
+}
