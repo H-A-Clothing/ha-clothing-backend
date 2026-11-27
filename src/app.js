@@ -3,10 +3,14 @@ import cors from "cors";
 import express from "express";
 import { env } from "./config/env.js";
 import { checkConnection } from "./config/database.js";
-import { errorHandler, notFoundHandler } from "./middleware/error.middleware.js";
+import {
+  errorHandler,
+  notFoundHandler,
+} from "./middleware/error.middleware.js";
 import catalogueRoutes from "./modules/catalogue/catalogue.routes.js";
 import productsRoutes from "./modules/products/products.routes.js";
 import financeRoutes from "./modules/finance/finance.routes.js";
+import adminRoutes from "./modules/admin/admin.routes.js";
 
 export const app = express();
 
@@ -18,9 +22,16 @@ const api = express.Router();
 api.get("/health", async (req, res) => {
   try {
     const db = await checkConnection();
-    res.json({ status: "ok", database: "up", databaseName: db.database, time: db.time });
+    res.json({
+      status: "ok",
+      database: "up",
+      databaseName: db.database,
+      time: db.time,
+    });
   } catch (error) {
-    res.status(503).json({ status: "degraded", database: "down", message: error.message });
+    res
+      .status(503)
+      .json({ status: "degraded", database: "down", message: error.message });
   }
 });
 
@@ -28,6 +39,7 @@ api.get("/health", async (req, res) => {
 api.use("/catalogue", catalogueRoutes); // M1
 api.use("/admin", productsRoutes); // M4
 api.use("/expenses", financeRoutes); // M7
+api.use("/admin", adminRoutes); // M8
 
 app.use("/api/v1", api);
 
