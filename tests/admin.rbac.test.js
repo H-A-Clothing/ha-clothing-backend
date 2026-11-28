@@ -1,14 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  requireAdmin,
-  requirePermission,
-  requireRole,
-} from "../src/middleware/role.middleware.js";
-import {
-  validateAssignStaff,
-  validateCreateRole,
-} from "../src/modules/admin/admin.validation.js";
+
+// Provide a fallback DATABASE_URL for CI environments where .env is not present.
+process.env.DATABASE_URL ??= "postgresql://test:test@localhost:5432/test";
+
+const { requireAdmin, requirePermission, requireRole } =
+  await import("../src/middleware/role.middleware.js");
+const { validateAssignStaff, validateCreateRole } =
+  await import("../src/modules/admin/admin.validation.js");
 
 function runMiddleware(middleware, req) {
   return new Promise((resolve) => {
