@@ -15,6 +15,10 @@ router.get("/products", controller.listProducts);
 router.get("/products/:id", controller.getProduct);
 router.post("/products", controller.createProduct);
 router.patch("/products/:id", controller.updateProduct);
+router.get("/products/:id/variants", controller.listVariants);
+router.post("/products/:id/variants", controller.createVariant);
+router.post("/products/:id/variants/bulk", controller.createVariantsBulk);
+router.patch("/variants/:variantId", controller.updateVariant);
 
 router.get("/colors", controller.listColors);
 router.post("/colors", controller.createColor);

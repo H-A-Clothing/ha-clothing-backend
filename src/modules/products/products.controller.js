@@ -44,3 +44,20 @@ export const createProduct = handle(async (req, res) => {
 export const updateProduct = handle(async (req, res) => {
   res.json({ data: await service.updateProduct(parseId(req.params.id), req.body) });
 });
+
+
+export const listVariants = handle(async (req, res) => {
+  res.json({ data: await service.listVariants(parseId(req.params.id)) });
+});
+
+export const createVariant = handle(async (req, res) => {
+  res.status(201).json({ data: await service.createVariant(parseId(req.params.id), req.body) });
+});
+
+export const createVariantsBulk = handle(async (req, res) => {
+  res.status(201).json({ data: await service.createVariantsBulk(parseId(req.params.id), req.body) });
+});
+
+export const updateVariant = handle(async (req, res) => {
+  res.json({ data: await service.updateVariant(parseId(req.params.variantId), req.body) });
+});

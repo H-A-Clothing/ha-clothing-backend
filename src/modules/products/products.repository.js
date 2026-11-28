@@ -165,3 +165,67 @@ export async function updateProduct(id, data) {
   const { rows } = await updateById("products", id, data);
   return rows[0] ?? null;
 }
+
+
+// ---- Variants ----
+export async function findVariantWithColor(id) {
+  const { rows } = await query(
+    `SELECT v.*, c.name AS color_name, c.hex AS color_hex
+     FROM product_variants v JOIN colors c ON c.id = v.color_id
+     WHERE v.id = $1`,
+    [id]
+  );
+  return rows[0] ?? null;
+}
+
+export async function findVariantById(id) {
+  const { rows } = await query("SELECT * FROM product_variants WHERE id = $1", [id]);
+  return rows[0] ?? null;
+}
+
+export async function findVariantBySku(sku) {
+  const { rows } = await query("SELECT id, sku FROM product_variants WHERE sku = $1", [sku]);
+  return rows[0] ?? null;
+}
+
+export async function findVariantByCombination(productId, colorId, size) {
+  const { rows } = await query(
+    "SELECT id FROM product_variants WHERE product_id = $1 AND color_id = $2 AND size = $3",
+    [productId, colorId, size]
+  );
+  return rows[0] ?? null;
+}
+
+export async function findColorIds(ids) {
+  const { rows } = await query("SELECT id FROM colors WHERE id = ANY($1::int[])", [ids]);
+  return rows.map((row) => row.id);
+}
+
+export async function insertVariant({ product_id, color_id, size, sku, is_active = true }) {
+  const { rows } = await query(
+    `INSERT INTO product_variants (product_id, color_id, size, sku, is_active)
+     VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+    [product_id, color_id, size, sku, is_active]
+  );
+  return rows[0];
+}
+
+// One INSERT statement, so either every variant is created or none is.
+export async function insertVariants(variants) {
+  const params = [];
+  const tuples = variants.map((variant) => {
+    params.push(variant.product_id, variant.color_id, variant.size, variant.sku);
+    const n = params.length;
+    return `($${n - 3}, $${n - 2}, $${n - 1}, $${n})`;
+  });
+  const { rows } = await query(
+    `INSERT INTO product_variants (product_id, color_id, size, sku) VALUES ${tuples.join(", ")} RETURNING id`,
+    params
+  );
+  return rows.map((row) => row.id);
+}
+
+export async function updateVariant(id, data) {
+  const { rows } = await updateById("product_variants", id, data);
+  return rows[0] ?? null;
+}
